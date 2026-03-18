@@ -1,6 +1,6 @@
---// KATA FARM FULL SYSTEM (ENGLISH)
+--// KATA FARM FULL SYSTEM (STABLE)
 
-repeat wait() until game:IsLoaded()
+repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
 local TeleportService = game:GetService("TeleportService")
@@ -12,6 +12,11 @@ local player = Players.LocalPlayer
 local runningHop = false
 local runningFarm = false
 local visited = {}
+
+-- SAFE CHARACTER
+function GetChar()
+    return player.Character or player.CharacterAdded:Wait()
+end
 
 -- GUI
 local gui = Instance.new("ScreenGui", game.CoreGui)
@@ -26,12 +31,10 @@ frame.BackgroundColor3 = Color3.fromRGB(20,20,20)
 
 hopBtn.Size = UDim2.new(1,0,0.3,0)
 hopBtn.Text = "HOP: OFF"
-hopBtn.BackgroundColor3 = Color3.fromRGB(200,80,80)
 
 farmBtn.Size = UDim2.new(1,0,0.3,0)
 farmBtn.Position = UDim2.new(0,0,0.3,0)
 farmBtn.Text = "FARM: OFF"
-farmBtn.BackgroundColor3 = Color3.fromRGB(200,80,80)
 
 status.Size = UDim2.new(1,0,0.4,0)
 status.Position = UDim2.new(0,0,0.6,0)
@@ -39,65 +42,47 @@ status.Text = "Status: Idle"
 status.TextColor3 = Color3.new(1,1,1)
 status.BackgroundTransparency = 1
 
--- DRAG GUI
-local dragging, dragStart, startPos
-
-frame.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton1 then
-        dragging = true
-        dragStart = input.Position
-        startPos = frame.Position
-    end
-end)
-
-game:GetService("UserInputService").InputChanged:Connect(function(input)
-    if dragging and input.UserInputType == Enum.UserInputType.MouseMovement then
-        local delta = input.Position - dragStart
-        frame.Position = UDim2.new(
-            startPos.X.Scale,
-            startPos.X.Offset + delta.X,
-            startPos.Y.Scale,
-            startPos.Y.Offset + delta.Y
-        )
-    end
-end)
-
 -- AUTO HAKI
 function AutoHaki()
     pcall(function()
-        if not player.Character:FindFirstChild("HasBuso") then
+        local char = GetChar()
+        if not char:FindFirstChild("HasBuso") then
             VirtualUser:CaptureController()
             VirtualUser:SetKeyDown("j")
-            wait(0.1)
+            task.wait(0.1)
             VirtualUser:SetKeyUp("j")
         end
     end)
 end
 
--- AUTO ATTACK (NO CLICK)
+-- AUTO ATTACK
 function AutoAttack()
-    spawn(function()
+    task.spawn(function()
         while runningFarm do
             pcall(function()
-                local tool = player.Character:FindFirstChildOfClass("Tool")
+                local char = GetChar()
+                local tool = char:FindFirstChildOfClass("Tool")
                 if tool then
                     tool:Activate()
                 end
             end)
-            wait(0.1)
+            task.wait(0.1)
         end
     end)
 end
 
--- EVADE + POSITION
+-- EVADE
 function AttackBoss(boss)
     while runningFarm and boss and boss:FindFirstChild("HumanoidRootPart") do
-        local hrp = player.Character.HumanoidRootPart
+        local char = GetChar()
+        local hrp = char:FindFirstChild("HumanoidRootPart")
         
-        hrp.CFrame = boss.HumanoidRootPart.CFrame *
-            CFrame.new(math.random(-10,10), 5, math.random(-10,10))
+        if hrp then
+            hrp.CFrame = boss.HumanoidRootPart.CFrame *
+                CFrame.new(math.random(-10,10), 5, math.random(-10,10))
+        end
         
-        wait(0.3)
+        task.wait(0.3)
     end
 end
 
@@ -128,7 +113,7 @@ function Hop()
         if v.playing < v.maxPlayers and not visited[v.id] then
             visited[v.id] = true
             TeleportService:TeleportToPlaceInstance(game.PlaceId, v.id, player)
-            wait(2)
+            task.wait(2)
         end
     end
 end
@@ -140,13 +125,13 @@ hopBtn.MouseButton1Click:Connect(function()
 
     while runningHop do
         if GetBoss() or CheckSummon() then
-            status.Text = "Boss/Summon Found"
+            status.Text = "Boss Found"
             break
         else
             status.Text = "Hopping..."
             Hop()
         end
-        wait(5)
+        task.wait(5)
     end
 end)
 
@@ -163,13 +148,13 @@ farmBtn.MouseButton1Click:Connect(function()
         local boss = GetBoss()
 
         if boss then
-            status.Text = "Fighting Dough King"
+            status.Text = "Fighting"
             AutoHaki()
             AttackBoss(boss)
         else
-            status.Text = "Waiting for Boss"
+            status.Text = "Waiting..."
         end
 
-        wait(2)
+        task.wait(2)
     end
 end)
