@@ -1,216 +1,176 @@
---// KATA HUB BETA (AUTO STEAL BOSS)
-
+--// KATA HUB BETA GUI (DELTA STEALTH - FULL)
 repeat task.wait() until game:IsLoaded()
 
 local Players = game:GetService("Players")
-local TeleportService = game:GetService("TeleportService")
-local HttpService = game:GetService("HttpService")
-local VirtualUser = game:GetService("VirtualUser")
+local RS = game:GetService("RunService")
+local VIM = game:GetService("VirtualInputManager")
+local Http = game:GetService("HttpService")
+local TP = game:GetService("TeleportService")
+local lp = Players.LocalPlayer
 
-local player = Players.LocalPlayer
+-- CONFIG
+_G.AutoFarm = false
+_G.AutoHop = false
+_G.MinPlayers = 2
+_G.MaxPlayers = 12
+_G.ServerList = _G.ServerList or {}
+_G.OffsetHeight = 14
+_G.OffsetForward = 8
 
 --================ GUI =================--
-local gui = Instance.new("ScreenGui", game.CoreGui)
-gui.Name = "KataHubV4"
+local ScreenGui = Instance.new("ScreenGui", game.CoreGui)
+ScreenGui.Name = "KataHubGUI"
 
-local main = Instance.new("Frame", gui)
-main.Size = UDim2.new(0,300,0,220)
-main.Position = UDim2.new(0.05,0,0.3,0)
-main.BackgroundColor3 = Color3.fromRGB(20,20,20)
-main.Active = true
-main.Draggable = true
-Instance.new("UICorner", main)
+local Frame = Instance.new("Frame", ScreenGui)
+Frame.Size = UDim2.new(0,200,0,150)
+Frame.Position = UDim2.new(0.05,0,0.3,0)
+Frame.BackgroundColor3 = Color3.fromRGB(25,25,25)
+Frame.Active = true
+Frame.Draggable = true
 
-local title = Instance.new("TextLabel", main)
-title.Size = UDim2.new(1,0,0,35)
-title.Text = "KATA HUB V4 🔥"
-title.TextColor3 = Color3.new(1,1,1)
-title.BackgroundTransparency = 1
+local Title = Instance.new("TextLabel", Frame)
+Title.Size = UDim2.new(1,0,0,30)
+Title.Text = "KATA HUB BETA"
+Title.TextColor3 = Color3.new(1,1,1)
+Title.BackgroundTransparency = 1
 
-local status = Instance.new("TextLabel", main)
-status.Position = UDim2.new(0,10,0,35)
-status.Size = UDim2.new(1,-20,0,20)
-status.Text = "Status: Idle"
-status.TextColor3 = Color3.fromRGB(0,255,0)
-status.BackgroundTransparency = 1
+local function createBtn(text, posY)
+    local b = Instance.new("TextButton", Frame)
+    b.Size = UDim2.new(0.9,0,0,30)
+    b.Position = UDim2.new(0.05,0,0,posY)
+    b.Text = text
+    b.BackgroundColor3 = Color3.fromRGB(40,40,40)
+    b.TextColor3 = Color3.new(1,1,1)
+    return b
+end
 
-local container = Instance.new("Frame", main)
-container.Position = UDim2.new(0,0,0,60)
-container.Size = UDim2.new(1,0,1,-60)
-container.BackgroundTransparency = 1
+local FarmBtn = createBtn("Auto Farm: OFF",40)
+local HopBtn = createBtn("Auto Hop: OFF",75)
+local CloseBtn = createBtn("Close GUI",110)
 
-local layout = Instance.new("UIListLayout", container)
-layout.Padding = UDim.new(0,10)
+--================ BUTTON =================--
+FarmBtn.MouseButton1Click:Connect(function()
+    _G.AutoFarm = not _G.AutoFarm
+    FarmBtn.Text = "Auto Farm: "..(_G.AutoFarm and "ON" or "OFF")
+end)
 
--- toggle UI
-function CreateToggle(text, callback)
-    local frame = Instance.new("Frame", container)
-    frame.Size = UDim2.new(1,-20,0,40)
-    frame.BackgroundColor3 = Color3.fromRGB(35,35,35)
-    Instance.new("UICorner", frame)
+HopBtn.MouseButton1Click:Connect(function()
+    _G.AutoHop = not _G.AutoHop
+    HopBtn.Text = "Auto Hop: "..(_G.AutoHop and "ON" or "OFF")
+end)
 
-    local label = Instance.new("TextLabel", frame)
-    label.Size = UDim2.new(0.6,0,1,0)
-    label.Text = text
-    label.TextColor3 = Color3.new(1,1,1)
-    label.BackgroundTransparency = 1
+CloseBtn.MouseButton1Click:Connect(function()
+    ScreenGui:Destroy()
+end)
 
-    local toggle = Instance.new("Frame", frame)
-    toggle.Size = UDim2.new(0,50,0,25)
-    toggle.Position = UDim2.new(1,-60,0.5,-12)
-    toggle.BackgroundColor3 = Color3.fromRGB(80,80,80)
-    Instance.new("UICorner", toggle).CornerRadius = UDim.new(1,0)
-
-    local knob = Instance.new("Frame", toggle)
-    knob.Size = UDim2.new(0,23,0,23)
-    knob.Position = UDim2.new(0,1,0,1)
-    knob.BackgroundColor3 = Color3.fromRGB(255,0,0)
-    Instance.new("UICorner", knob).CornerRadius = UDim.new(1,0)
-
-    local state = false
-
-    toggle.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            state = not state
-
-            if state then
-                knob:TweenPosition(UDim2.new(1,-24,0,1),"Out","Quad",0.2,true)
-                knob.BackgroundColor3 = Color3.fromRGB(0,255,0)
-            else
-                knob:TweenPosition(UDim2.new(0,1,0,1),"Out","Quad",0.2,true)
-                knob.BackgroundColor3 = Color3.fromRGB(255,0,0)
+--================ ANTI KICK =================--
+pcall(function()
+    local mt = getrawmetatable(game)
+    if mt and not getgenv()._BetaHook then
+        local old = mt.__namecall
+        setreadonly(mt,false)
+        mt.__namecall = newcclosure(function(self,...)
+            if tostring(getnamecallmethod()) == "Kick" and not checkcaller() then
+                return nil
             end
+            return old(self,...)
+        end)
+        setreadonly(mt,true)
+        getgenv()._BetaHook = true
+    end
+end)
 
-            callback(state)
+--================ HOP =================--
+local function FastHop()
+    if not _G.AutoHop then return end
+    
+    pcall(function()
+        local Api = "https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100"
+        local list = Http:JSONDecode(game:HttpGet(Api))
+
+        for _,s in ipairs(list.data) do
+            if s.playing >= _G.MinPlayers and s.playing <= _G.MaxPlayers
+            and s.id ~= game.JobId
+            and not table.find(_G.ServerList,s.id) then
+                
+                table.insert(_G.ServerList,s.id)
+                TP:TeleportToPlaceInstance(game.PlaceId,s.id,lp)
+                task.wait(10)
+                return
+            end
         end
     end)
 end
 
---================ FUNCTIONS =================--
-
-function GetBoss()
-    for _,v in pairs(workspace.Enemies:GetChildren()) do
-        if string.find(v.Name,"Dough King") then
-            return v
+--================ FIND BOSS =================--
+local function GetBoss()
+    for _,folder in ipairs({workspace:FindFirstChild("Enemies"), workspace:FindFirstChild("NPCs"), workspace}) do
+        if folder then
+            for _,v in ipairs(folder:GetChildren()) do
+                if v:FindFirstChild("Humanoid") and v.Humanoid.Health > 0 then
+                    local name = v.Name:lower()
+                    if name:find("dough king") or name:find("rip_indra") then
+                        return v
+                    end
+                end
+            end
         end
     end
 end
 
-function GetIndra()
-    for _,v in pairs(workspace.Enemies:GetChildren()) do
-        if string.find(v.Name,"rip_indra") or string.find(v.Name,"Indra") then
-            return v
+--================ COMBAT (M1 ONLY) =================--
+local function AttackBoss(boss)
+    local hrp = lp.Character and lp.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+
+    local bv = Instance.new("BodyVelocity", hrp)
+    bv.MaxForce = Vector3.new(1e9,1e9,1e9)
+    bv.Velocity = Vector3.zero
+
+    repeat
+        if not boss or boss.Humanoid.Health <= 0 then break end
+
+        local targetCF = boss.HumanoidRootPart.CFrame * CFrame.new(0,_G.OffsetHeight,_G.OffsetForward)
+        hrp.CFrame = hrp.CFrame:Lerp(targetCF,0.2)
+
+        local tool = lp.Character:FindFirstChildOfClass("Tool") or lp.Backpack:FindFirstChildOfClass("Tool")
+        if tool then
+            lp.Character.Humanoid:EquipTool(tool)
+            tool:Activate() -- M1 ONLY
         end
-    end
-end
 
-function AutoHaki()
-    if not player.Character:FindFirstChild("HasBuso") then
-        VirtualUser:CaptureController()
-        VirtualUser:SetKeyDown("j")
-        task.wait(0.1)
-        VirtualUser:SetKeyUp("j")
-    end
-end
-
-function KillBoss(boss)
-    repeat task.wait()
-        if not boss or not boss:FindFirstChild("HumanoidRootPart") then break end
-
-        AutoHaki()
-
-        player.Character.HumanoidRootPart.CFrame =
-            boss.HumanoidRootPart.CFrame * CFrame.new(0,10,0)
-
-        local tool = player.Character:FindFirstChildOfClass("Tool")
-        if tool then tool:Activate() end
-
+        VIM:SendKeyEvent(true,"J",false,game) -- Haki
+        
+        task.wait(math.random(10,16)/100)
     until not boss or boss.Humanoid.Health <= 0
+
+    bv:Destroy()
 end
 
--- detect fight
-function IsBossFighting(boss)
-    if not boss or not boss:FindFirstChild("Humanoid") then return false end
-    local old = boss.Humanoid.Health
-    task.wait(0.8)
-    return boss.Humanoid.Health < old
-end
-
-function PlayersNearBoss(boss)
-    local count = 0
-    for _,plr in pairs(Players:GetPlayers()) do
-        if plr.Character and plr.Character:FindFirstChild("HumanoidRootPart") then
-            local dist = (plr.Character.HumanoidRootPart.Position - boss.HumanoidRootPart.Position).Magnitude
-            if dist < 50 then
-                count = count + 1
-            end
-        end
-    end
-    return count >= 2
-end
-
-function IsGoodServer()
-    local boss = GetBoss() or GetIndra()
-    if boss then
-        if IsBossFighting(boss) or PlayersNearBoss(boss) then
-            return true, boss
-        end
-    end
-    return false
-end
-
-function FastHop()
-    local req = game:HttpGet("https://games.roblox.com/v1/games/"..game.PlaceId.."/servers/Public?sortOrder=Asc&limit=100")
-    local data = HttpService:JSONDecode(req)
-
-    for _,v in pairs(data.data) do
-        if v.playing < v.maxPlayers then
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, v.id, player)
-            task.wait(1)
-        end
-    end
-end
-
--- MAIN AUTO
-function AutoStealBoss()
-    task.spawn(function()
-        while true do
-            local ok, boss = IsGoodServer()
-
-            if ok and boss then
-                status.Text = "Status: Boss đang bị đánh 🔥"
-
-                repeat task.wait()
-                    if not boss then break end
-
-                    player.Character.HumanoidRootPart.CFrame =
-                        boss.HumanoidRootPart.CFrame * CFrame.new(0,10,0)
-
-                    AutoHaki()
-
-                    local tool = player.Character:FindFirstChildOfClass("Tool")
-                    if tool then tool:Activate() end
-
-                until not boss or boss.Humanoid.Health <= 0
-
-                status.Text = "Status: Xong boss 😎"
-                break
+--================ MAIN LOOP =================--
+task.spawn(function()
+    while true do
+        if _G.AutoFarm then
+            local boss = GetBoss()
+            if boss then
+                AttackBoss(boss)
             else
-                status.Text = "Status: Không có → hop..."
-                FastHop()
+                if _G.AutoHop then
+                    FastHop()
+                end
             end
-
-            task.wait(1)
         end
-    end)
-end
+        task.wait(1)
+    end
+end)
 
---================ TOGGLE =================--
-
-CreateToggle("Auto Steal Boss 🔥", function(v)
-    if v then
-        AutoStealBoss()
-    else
-        status.Text = "Status: Idle"
+--================ NOCLIP =================--
+RS.Stepped:Connect(function()
+    if lp.Character then
+        for _,v in ipairs(lp.Character:GetDescendants()) do
+            if v:IsA("BasePart") then
+                v.CanCollide = false
+            end
+        end
     end
 end)
